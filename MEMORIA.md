@@ -146,7 +146,7 @@ Limitaciones:
 
 - **Síntoma:** al levantar el Compose en el portátil (Fedora), el backend entra en bucle de reinicio. En `docker compose logs backend`: `psycopg.OperationalError: connection to server at "172.19.0.2", port 5432 failed: No route to host`. La base de datos estaba `healthy`.
 - **Diagnóstico:** el error no es de credenciales ni de que PostgreSQL no estuviera listo (eso daría `connection refused` o `authentication failed`): es la red la que rechaza el paquete. `firewall-cmd --info-zone=docker` mostraba la zona `docker` sin ninguna interfaz, así que el puente de la red de Compose quedaba fuera de ella y firewalld rechazaba el tráfico entre contenedores. El mismo Compose funcionaba en el runner de GitHub Actions (Ubuntu, sin firewalld), lo que confirmaba que el fichero estaba bien.
-- **Solución:** _pendiente de aplicar y comprobar_ (`sudo systemctl restart docker`, para que Docker vuelva a registrar sus redes en firewalld).
+- **Solución:** `sudo systemctl restart docker`. Al arrancar, Docker vuelve a registrar sus puentes en la zona `docker` (después: `interfaces: br-... docker0`). Al levantar el Compose de nuevo, su puente aparece en la zona, los dos servicios llegan a `healthy` y el backend lee de PostgreSQL. Efecto secundario: el reinicio para todos los contenedores, incluido el nodo de Minikube (hay que volver a hacer `minikube start`).
 
 ### 7.2 Al construir las imágenes
 
