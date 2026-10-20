@@ -1,0 +1,14 @@
+server {
+    listen 80;
+
+    location / {
+        root /usr/share/nginx/html;
+        index index.html;
+    }
+
+    # El navegador solo habla con nginx: /api/rooms se reenvía a BACKEND_URL/rooms.
+    # Así no hace falta CORS ni exponer el backend fuera.
+    location /api/ {
+        proxy_pass ${BACKEND_URL}/;
+    }
+}

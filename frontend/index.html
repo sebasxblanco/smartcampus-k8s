@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SmartCampus</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; color: #1f2933; }
+    h1 { margin-bottom: 0; }
+    .estado { color: #52606d; margin-top: .25rem; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 2rem; }
+    th, td { text-align: left; padding: .5rem; border-bottom: 1px solid #d9e2ec; }
+    th { background: #f0f4f8; }
+    form { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+    input, button { padding: .4rem .6rem; font: inherit; }
+    .error { color: #b42318; }
+  </style>
+</head>
+<body>
+  <h1>SmartCampus</h1>
+  <p class="estado" id="estado">Conectando con el backend...</p>
+
+  <h2>Aulas</h2>
+  <form id="form-aula">
+    <input name="nombre" placeholder="Nombre" required>
+    <input name="edificio" placeholder="Edificio" required>
+    <input name="capacidad" type="number" min="1" placeholder="Capacidad" required>
+    <input name="equipamiento" placeholder="Equipamiento (separado por comas)">
+    <button>Añadir aula</button>
+  </form>
+  <table>
+    <thead><tr><th>ID</th><th>Nombre</th><th>Edificio</th><th>Capacidad</th><th>Equipamiento</th></tr></thead>
+    <tbody id="aulas"></tbody>
+  </table>
+
+  <h2>Reservas</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Aula</th><th>Usuario</th><th>Fecha</th><th>Inicio</th><th>Fin</th></tr></thead>
+    <tbody id="reservas"></tbody>
+  </table>
+
+  <script src="app.js"></script>
+</body>
+</html>

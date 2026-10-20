@@ -1,0 +1,14 @@
+.git
+.githooks
+.github
+.venv
+.env
+_entender
+tests
+scripts
+**/__pycache__
+.pytest_cache
+.ruff_cache
+*.db
+commit-log.txt
+push-log.txt

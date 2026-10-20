@@ -1,0 +1,15 @@
+# Service "headless" (clusterIP: None), el que pide un StatefulSet: el nombre
+# database-service resuelve directamente a la IP del Pod database-0.
+# El backend se conecta por este nombre, nunca por la IP del Pod.
+apiVersion: v1
+kind: Service
+metadata:
+  name: database-service
+  namespace: smartcampus
+spec:
+  clusterIP: None
+  selector:
+    app: database
+  ports:
+    - port: 5432
+      targetPort: 5432

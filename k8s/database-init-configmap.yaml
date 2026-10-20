@@ -1,0 +1,38 @@
+# init.sql montado en /docker-entrypoint-initdb.d: PostgreSQL lo ejecuta solo
+# la primera vez, con el volumen vacío. Copia de database/init.sql.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: database-init
+  namespace: smartcampus
+data:
+  init.sql: |
+    -- Se ejecuta solo la primera vez que arranca PostgreSQL con el volumen vacío.
+    -- Las columnas coinciden con app/models.py del backend.
+    
+    CREATE TABLE IF NOT EXISTS rooms (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(100) NOT NULL,
+        edificio VARCHAR(100) NOT NULL,
+        capacidad INTEGER NOT NULL CHECK (capacidad > 0),
+        equipamiento JSON NOT NULL
+    );
+    
+    CREATE TABLE IF NOT EXISTS bookings (
+        id SERIAL PRIMARY KEY,
+        aula_id INTEGER NOT NULL REFERENCES rooms (id) ON DELETE CASCADE,
+        usuario VARCHAR(100) NOT NULL,
+        fecha DATE NOT NULL,
+        hora_inicio TIME NOT NULL,
+        hora_fin TIME NOT NULL
+    );
+    
+    INSERT INTO rooms (nombre, edificio, capacidad, equipamiento) VALUES
+        ('Laboratorio de Robótica', 'Edificio A', 30, '["ordenadores", "robots", "impresora 3D"]'),
+        ('Aula Magna', 'Edificio B', 200, '["proyector", "micrófono"]'),
+        ('Sala de Reuniones 1', 'Edificio A', 12, '["pantalla"]');
+    
+    INSERT INTO bookings (aula_id, usuario, fecha, hora_inicio, hora_fin) VALUES
+        (1, 'ana.garcia', '2026-11-02', '10:00', '12:00'),
+        (2, 'luis.perez', '2026-11-03', '09:00', '11:00'),
+        (1, 'marta.ruiz', '2026-11-02', '12:00', '13:00');

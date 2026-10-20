@@ -1,0 +1,13 @@
+# Configuración NO sensible. El backend lee APP_ENV (se ve en GET /info y en la
+# cabecera del frontend) y el frontend lee BACKEND_URL para saber a dónde reenviar /api/.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: smartcampus-config
+  namespace: smartcampus
+data:
+  APP_ENV: "kubernetes"
+  BACKEND_URL: "http://backend-service:8000"
+  DB_HOST: "database-service"
+  DB_PORT: "5432"
+  DB_NAME: "smartcampus"

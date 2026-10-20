@@ -1,0 +1,13 @@
+# ClusterIP: solo accesible dentro del clúster. Reparte las peticiones entre las
+# réplicas del backend. El frontend llega por el nombre backend-service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: smartcampus
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8000
+      targetPort: 8000

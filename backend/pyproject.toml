@@ -1,0 +1,14 @@
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "unit: tests de funciones sueltas (los pasa el pre-commit)",
+    "integration: tests de endpoints HTTP (los pasa el pre-push)",
+]
