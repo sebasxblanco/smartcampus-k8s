@@ -82,4 +82,16 @@ pytest
 
 ## Evidencias
 
-Capturas en `docs/evidencias/` (ver la sección 5 de la memoria).
+Capturas en `docs/evidencias/`; el resultado de cada prueba está en la sección 5 de la [memoria](MEMORIA.md).
+
+- D1 · `docker compose ps`: [d1-compose-ps.png](docs/evidencias/d1-compose-ps.png)
+- D2 · `/health`: [d2-health.png](docs/evidencias/d2-health.png)
+- D3 · backend ↔ PostgreSQL: [d3-rooms.png](docs/evidencias/d3-rooms.png)
+- D4 · frontend con Docker Compose: [d4-frontend.png](docs/evidencias/d4-frontend.png)
+- D5 · persistencia con volumen: [d5-persistencia.png](docs/evidencias/d5-persistencia.png)
+- D6 · `docker stop` del backend: [d6-stop.png](docs/evidencias/d6-stop.png)
+- K1 · `get pods`, `get services`, `get deployments`: [k1-recursos.png](docs/evidencias/k1-recursos.png)
+- K1 · aplicación en Kubernetes y en Compose: [k1-navegador.png](docs/evidencias/k1-navegador.png)
+- K2 · escalado 2 → 4 → 2: [k2-escalado.png](docs/evidencias/k2-escalado.png)
+- K3 · self-healing al borrar un Pod: [k3-self-healing.png](docs/evidencias/k3-self-healing.png)
+- K4 · cambio en el ConfigMap: [k4-configmap.png](docs/evidencias/k4-configmap.png)

@@ -107,21 +107,21 @@ Limitaciones:
 
 | # | Prueba | Resultado | Captura |
 |---|---|---|---|
-| D1 | `docker compose up -d` y `docker compose ps` | _pendiente_ | `d1-compose-ps.png` |
-| D2 | `/health` | _pendiente_ | `d2-health.png` |
-| D3 | Backend ↔ BD (`/rooms` devuelve los datos de `init.sql`) | _pendiente_ | `d3-rooms.png` |
-| D4 | Frontend en el navegador | _pendiente_ | `d4-frontend.png` |
-| D5 | Persistencia: crear un aula, `down`, `up` | _pendiente_ | `d5-persistencia.png` |
-| D6 | `docker stop` del backend | _pendiente_ | `d6-stop.png` |
+| D1 | `docker compose up -d --build --wait` y `docker compose ps` | Las dos imágenes propias se construyen y los 3 servicios quedan en marcha; `database` y `backend` en `healthy` | [d1-compose-ps.png](docs/evidencias/d1-compose-ps.png) |
+| D2 | `/health` | `{"status":"ok"}` directo en el 8000 y también a través del frontend (`/api/health` en el 8080) | [d2-health.png](docs/evidencias/d2-health.png) |
+| D3 | Backend ↔ BD | `SELECT` en PostgreSQL devuelve las 3 aulas de `init.sql` y `/rooms` devuelve las mismas 3: el backend lee de la base de datos | [d3-rooms.png](docs/evidencias/d3-rooms.png) |
+| D4 | Frontend en el navegador | La página muestra "Backend conectado · entorno: development" y las aulas y reservas que devuelve el backend | [d4-frontend.png](docs/evidencias/d4-frontend.png) |
+| D5 | Persistencia: crear un aula, `down`, `up` | El aula "Aula Persistente" (id 4) sigue ahí tras `docker compose down` y `up`: `down` sin `-v` borra contenedores y redes, no el volumen `smartcampus-k8s_db-data` | [d5-persistencia.png](docs/evidencias/d5-persistencia.png) |
+| D6 | `docker stop` del backend | 10 s después el backend sigue `Exited (0)` y el frontend devuelve `502`. La política es `unless-stopped`, que solo reinicia un contenedor que termina por sí mismo, no uno parado a mano. Hay que levantarlo con `docker compose up -d`, y entonces vuelve `{"status":"ok"}` | [d6-stop.png](docs/evidencias/d6-stop.png) |
 
 ### Kubernetes
 
 | # | Experimento | Resultado | Captura |
 |---|---|---|---|
-| K1 | `kubectl apply -f k8s/`, `get pods`, `get services`, `get deployments`, frontend en el navegador | Todo en `Running`; `/api/health`, `/api/rooms` y `/api/bookings` responden a través del NodePort (20 oct) | `k1-*.png` |
-| K2 | Escalar el backend a 4 réplicas y volver a 2 | _pendiente_ | `k2-escalado.png` |
-| K3 | Borrar un Pod del backend | _pendiente_ | `k3-self-healing.png` |
-| K4 | Cambiar `APP_ENV` en el ConfigMap | _pendiente_ | `k4-configmap.png` |
+| K1 | `kubectl apply -f k8s/`, `get pods`, `get services`, `get deployments`, frontend en el navegador | Todo en `Running`; el frontend responde en `http://192.168.49.2:30080` (NodePort) con "entorno: kubernetes", leído del ConfigMap. En la captura del navegador, a la izquierda Kubernetes y a la derecha Docker Compose (`localhost:8080`, "entorno: development"): la misma aplicación desplegada de las dos formas | [k1-recursos.png](docs/evidencias/k1-recursos.png) · [k1-navegador.png](docs/evidencias/k1-navegador.png) |
+| K2 | Escalar el backend a 4 réplicas y volver a 2 | Con `--replicas=4` aparecen 2 Pods nuevos (6 s de edad) junto a los 2 existentes; al bajar a 2, los dos más recientes pasan a `Terminating` y se conservan los antiguos | [k2-escalado.png](docs/evidencias/k2-escalado.png) |
+| K3 | Borrar un Pod del backend | Se borra `backend-...-p2ww7`; justo después ya existe uno nuevo (`pww27`, en `Init:0/1`, ejecutando el initContainer que espera a la base de datos) mientras el viejo está en `Terminating`; 15 s después vuelve a haber 2 réplicas `Running`. Quien lo recrea es el **ReplicaSet** (`DESIRED 2`), que gestiona el Deployment. Un contenedor de Docker borrado a mano no lo recrea nadie (D6) | [k3-self-healing.png](docs/evidencias/k3-self-healing.png) |
+| K4 | Cambiar `APP_ENV` en el ConfigMap | Tras `kubectl patch` a `kubernetes-v2`, `/api/info` sigue diciendo `kubernetes`: las variables de entorno se leen al arrancar el contenedor. Tras `kubectl rollout restart deployment backend` (rolling update, sin corte) devuelve `kubernetes-v2`. Después se restauró el valor original con `kubectl apply -f k8s/configmap.yaml` | [k4-configmap.png](docs/evidencias/k4-configmap.png) |
 
 ## 6. Comparativa Docker Compose y Kubernetes
 
@@ -150,7 +150,7 @@ Limitaciones:
 
 ### 7.2 Al construir las imágenes
 
-_Pendiente: anotar al encontrarlo._
+No apareció ningún problema al construir las imágenes. Como comprobación, `docker build --check` sobre los dos Dockerfiles (backend y frontend) termina con `Check complete, no warnings found.` Las decisiones que lo evitan: el backend instala las dependencias antes de copiar el código (la capa de `pip install` se reutiliza de la caché si solo cambia el código), un `.dockerignore` deja fuera tests, entornos virtuales y `.env`, y la imagen corre con un usuario sin privilegios. Un detalle de Minikube que hay que tener en cuenta: las imágenes se construyen dentro del Docker de Minikube con `minikube image build` (por eso `imagePullPolicy: Never`), así que tras reconstruir una imagen con la misma etiqueta `latest` los Pods que ya existen no la recogen hasta un `kubectl rollout restart`.
 
 ### 7.3 Durante el despliegue
 
