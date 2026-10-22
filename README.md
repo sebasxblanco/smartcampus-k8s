@@ -27,6 +27,8 @@ docker compose ps                    # los 3 servicios en marcha
 - Frontend: http://localhost:8080
 - Backend: http://localhost:8000/health · http://localhost:8000/docs
 
+Si otro proyecto ya usa el 8000 o el 8080, cambiar `BACKEND_PORT` y `FRONTEND_PORT` en el `.env`.
+
 ## Despliegue con Kubernetes (Minikube)
 
 ```bash
