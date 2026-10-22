@@ -36,7 +36,7 @@ La solución es una aplicación de tres servicios independientes (frontend, back
 | Servicio | Imagen | Detalles |
 |---|---|---|
 | backend | `smartcampus-backend` (propia, desde `python:3.12-slim`) | Instala primero `requirements.txt` para aprovechar la caché de capas; copia solo `app/`; se ejecuta con un usuario sin privilegios; `HEALTHCHECK` contra `/health` |
-| frontend | `smartcampus-frontend` (propia, desde `nginx:alpine`) | La configuración es una plantilla: la imagen oficial de nginx sustituye `${BACKEND_URL}` al arrancar, así que la misma imagen sirve para Compose y para Kubernetes |
+| frontend | `smartcampus-frontend` (propia, desde `nginx:alpine`) | La configuración es una plantilla: la imagen oficial de nginx sustituye `${BACKEND_URL}` al arrancar, así que la misma imagen sirve para Compose y para Kubernetes. nginx resuelve el backend en cada petición, no al arrancar (ver el problema 7.4) |
 | database | `postgres:18` (oficial) | Sin Dockerfile propio |
 
 ### Docker Compose
@@ -45,7 +45,7 @@ La solución es una aplicación de tres servicios independientes (frontend, back
 |---|---|
 | Servicios | `frontend`, `backend`, `database` |
 | Redes | `frontend-net` (frontend y backend) y `backend-net` (backend y base de datos). El frontend no tiene ruta a la base de datos |
-| Puertos | Frontend `8080:80`, backend `8000:8000` (para probar `/health`). PostgreSQL no se publica |
+| Puertos | Frontend `8080:80`, backend `8000:8000` (para probar `/health`), configurables con `FRONTEND_PORT` y `BACKEND_PORT` en el `.env` (ver el problema 7.3). PostgreSQL no se publica |
 | Variables | Se leen de `.env` (plantilla en `.env.example`, el `.env` real no se versiona) |
 | Dependencias | `depends_on` con `condition: service_healthy`: el backend espera a que PostgreSQL responda a `pg_isready` y el frontend al healthcheck del backend |
 | Volúmenes | `db-data` para los datos de PostgreSQL y `init.sql` montado en `/docker-entrypoint-initdb.d` |
@@ -152,13 +152,17 @@ Limitaciones:
 
 _Pendiente: anotar al encontrarlo._
 
-### 7.3 Durante el despliegue
+### 7.3 Durante el despliegue: el puerto 8000 ya está ocupado
 
-_Pendiente: anotar al encontrarlo._
+- **Síntoma:** `docker compose up -d --build` levanta la base de datos, pero el backend no arranca: `Bind for 0.0.0.0:8000 failed: port is already allocated`.
+- **Diagnóstico:** `docker ps --filter publish=8000 --filter publish=8080` muestra que los puertos los ocupan contenedores de otro proyecto del mismo equipo (la práctica SmartCampus de la asignatura de Despliegue y Automatización: su entorno de desarrollo en el 8000 y su despliegue de producción en el 8080). Un puerto del host solo lo puede publicar un contenedor a la vez, aunque cada proyecto tenga sus propias redes.
+- **Solución:** los puertos del host pasan a ser variables con valor por defecto en `docker-compose.yml` (`"${BACKEND_PORT:-8000}:8000"` y `"${FRONTEND_PORT:-8080}:80"`), documentadas en `.env.example`. Sin tocar nada se usan 8000 y 8080; si chocan, se cambian en el `.env` (comprobado con 8002 y 8082: los 3 servicios `healthy` y la API respondiendo a través del frontend). Para las capturas se para el otro proyecto y se usan los puertos por defecto. En Kubernetes no pasa: cada Service tiene su propia IP virtual y solo el NodePort (30080) ocupa un puerto del nodo.
 
-### 7.4 En Kubernetes
+### 7.4 En Kubernetes: el frontend se reinicia al arrancar el clúster
 
-_Pendiente: anotar al encontrarlo._
+- **Síntoma:** tras reiniciar Minikube, `kubectl get pods` muestra el Pod del frontend con 3 reinicios (`Last State: Terminated, Reason: Error, Exit Code: 1`). Al final queda `Running`, pero tarda.
+- **Diagnóstico:** `kubectl logs <pod-frontend> --previous` da `nginx: [emerg] host not found in upstream "backend-service"`. Con `proxy_pass http://backend-service:8000/` escrito tal cual, nginx resuelve el nombre **una sola vez, al arrancar**, y si no lo consigue se niega a arrancar. Al levantarse el clúster, el frontend arrancó antes de que el DNS del clúster respondiera por `backend-service`, y el kubelet lo fue reiniciando (con espera creciente) hasta que el nombre se resolvió. Es un acoplamiento de arranque: el frontend no debería depender de que el backend exista para levantarse. En Compose no se vio porque `depends_on` con `condition: service_healthy` hace esperar al frontend, pero en Kubernetes no existe un orden de arranque entre Deployments.
+- **Solución:** que nginx resuelva el nombre en cada petición. En la plantilla, `resolver ${NGINX_LOCAL_RESOLVERS}` (la imagen oficial lo rellena con el DNS de `/etc/resolv.conf` si se activa `NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1` en el Dockerfile) y la dirección del backend en una variable (`set $backend ...; proxy_pass $backend;`). Como el resolver de nginx no aplica los dominios de búsqueda del Pod, `BACKEND_URL` pasa a ser el nombre completo `http://backend-service.smartcampus.svc.cluster.local:8000` en el ConfigMap. **Comprobación:** con `backend-service` borrado a propósito, el frontend arranca sin reinicios y `/api/health` responde `502`; al volver a crear el Service, responde `{"status":"ok"}` sin reiniciar nada. En Compose sigue funcionando igual (DNS `127.0.0.11`, nombre `backend`).
 
 ## 8. Conclusiones
 
