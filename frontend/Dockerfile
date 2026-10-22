@@ -7,5 +7,7 @@ COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY index.html app.js /usr/share/nginx/html/
 
 ENV BACKEND_URL=http://backend:8000
+# Rellena NGINX_LOCAL_RESOLVERS con el DNS del contenedor (lo usa la plantilla).
+ENV NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
 
 EXPOSE 80

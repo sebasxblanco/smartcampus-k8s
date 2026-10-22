@@ -1,6 +1,11 @@
 server {
     listen 80;
 
+    # DNS que usa nginx para resolver el backend en cada petición. La imagen oficial
+    # lo rellena con el de /etc/resolv.conf (NGINX_ENTRYPOINT_LOCAL_RESOLVERS en el
+    # Dockerfile): 127.0.0.11 en Docker Compose, el de CoreDNS en Kubernetes.
+    resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
+
     location / {
         root /usr/share/nginx/html;
         index index.html;
@@ -8,7 +13,11 @@ server {
 
     # El navegador solo habla con nginx: /api/rooms se reenvía a BACKEND_URL/rooms.
     # Así no hace falta CORS ni exponer el backend fuera.
+    # La dirección va en una variable para que nginx no la resuelva al arrancar:
+    # si el backend aún no existe, nginx arranca igual y responde 502 hasta que aparezca.
     location /api/ {
-        proxy_pass ${BACKEND_URL}/;
+        set $backend ${BACKEND_URL};
+        rewrite ^/api/(.*)$ /$1 break;
+        proxy_pass $backend;
     }
 }

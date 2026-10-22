@@ -7,7 +7,8 @@ metadata:
   namespace: smartcampus
 data:
   APP_ENV: "kubernetes"
-  BACKEND_URL: "http://backend-service:8000"
+  # Nombre completo: el resolver de nginx no aplica los dominios de búsqueda del Pod.
+  BACKEND_URL: "http://backend-service.smartcampus.svc.cluster.local:8000"
   DB_HOST: "database-service"
   DB_PORT: "5432"
   DB_NAME: "smartcampus"
