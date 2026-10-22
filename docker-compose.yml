@@ -1,13 +1,14 @@
 # Arranque: docker compose up --build -d
 # Lee las variables del fichero .env (copia de .env.example con valores reales).
+# Sin .env, Compose se detiene con un mensaje claro en vez de arrancar PostgreSQL sin contraseña.
 
 services:
   database:
     image: postgres:18
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: "${DB_NAME:?falta el .env, copia .env.example a .env}"
+      POSTGRES_USER: "${DB_USER:?falta el .env, copia .env.example a .env}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?falta el .env, copia .env.example a .env}"
     volumes:
       # Desde PostgreSQL 18 los datos se montan en /var/lib/postgresql.
       - db-data:/var/lib/postgresql
@@ -28,12 +29,12 @@ services:
     build: ./backend
     image: smartcampus-backend:latest
     environment:
-      APP_ENV: ${APP_ENV}
+      APP_ENV: ${APP_ENV:-development}
       DB_HOST: database
       DB_PORT: 5432
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: "${DB_NAME:?falta el .env, copia .env.example a .env}"
+      DB_USER: "${DB_USER:?falta el .env, copia .env.example a .env}"
+      DB_PASSWORD: "${DB_PASSWORD:?falta el .env, copia .env.example a .env}"
     ports:
       # Puerto del host configurable: por defecto 8000 (ver el problema 7.3 de la memoria).
       - "${BACKEND_PORT:-8000}:8000"

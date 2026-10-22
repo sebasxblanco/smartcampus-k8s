@@ -1,5 +1,12 @@
 # Memoria técnica · SmartCampus con Docker Compose y Kubernetes
 
+| | |
+|---|---|
+| Asignatura | 76045 · Despliegue y Monitorización en la Nube |
+| Autor | Sebastián Blanco |
+| Fecha | 22 de octubre de 2026 |
+| Repositorio | https://github.com/sebasxblanco/smartcampus-k8s |
+
 ## 1. Introducción
 
 SmartCampus Solutions gestiona las aulas y las reservas de espacios de una universidad. Para este prototipo la dirección exige que la aplicación pueda desplegarse con contenedores y que el equipo domine tanto Docker Compose como Kubernetes.
@@ -46,7 +53,7 @@ La solución es una aplicación de tres servicios independientes (frontend, back
 | Servicios | `frontend`, `backend`, `database` |
 | Redes | `frontend-net` (frontend y backend) y `backend-net` (backend y base de datos). El frontend no tiene ruta a la base de datos |
 | Puertos | Frontend `8080:80`, backend `8000:8000` (para probar `/health`), configurables con `FRONTEND_PORT` y `BACKEND_PORT` en el `.env` (ver el problema 7.3). PostgreSQL no se publica |
-| Variables | Se leen de `.env` (plantilla en `.env.example`, el `.env` real no se versiona) |
+| Variables | Se leen de `.env` (plantilla en `.env.example`, el `.env` real no se versiona). Las credenciales usan `${VAR:?mensaje}`: si falta el `.env`, Compose se detiene con un error claro en vez de arrancar PostgreSQL sin contraseña |
 | Dependencias | `depends_on` con `condition: service_healthy`: el backend espera a que PostgreSQL responda a `pg_isready` y el frontend al healthcheck del backend |
 | Volúmenes | `db-data` para los datos de PostgreSQL y `init.sql` montado en `/docker-entrypoint-initdb.d` |
 | Reinicio | `restart: unless-stopped` |
@@ -54,6 +61,8 @@ La solución es una aplicación de tres servicios independientes (frontend, back
 **Comunicación:** Compose crea un DNS interno en cada red. El backend llega a la base de datos con el nombre `database` y el frontend al backend con `backend`.
 
 ## 4. Despliegue con Kubernetes
+
+**Pods.** El Pod es la unidad mínima que Kubernetes programa en un nodo: uno o varios contenedores que comparten IP, puertos y volúmenes. Aquí cada Pod lleva un solo contenedor de aplicación (el del backend tiene además un initContainer que espera a PostgreSQL). Ningún Pod se crea a mano: los del backend y el frontend los crea el ReplicaSet de su Deployment, y el de la base de datos, el StatefulSet. Un Pod no se repara: si falla o se borra, su controlador crea otro con nombre e IP nuevos (lo demuestra K3), y por eso la comunicación va siempre a través de Services.
 
 | Recurso | Fichero | Para qué |
 |---|---|---|
@@ -114,6 +123,30 @@ Limitaciones:
 | D5 | Persistencia: crear un aula, `down`, `up` | El aula "Aula Persistente" (id 4) sigue ahí tras `docker compose down` y `up`: `down` sin `-v` borra contenedores y redes, no el volumen `smartcampus-k8s_db-data` | [d5-persistencia.png](docs/evidencias/d5-persistencia.png) |
 | D6 | `docker stop` del backend | 10 s después el backend sigue `Exited (0)` y el frontend devuelve `502`. La política es `unless-stopped`, que solo reinicia un contenedor que termina por sí mismo, no uno parado a mano. Hay que levantarlo con `docker compose up -d`, y entonces vuelve `{"status":"ok"}` | [d6-stop.png](docs/evidencias/d6-stop.png) |
 
+**D1 · `docker compose ps`**
+
+![D1: docker compose ps con los 3 servicios en marcha](docs/evidencias/d1-compose-ps.png)
+
+**D2 · `/health`**
+
+![D2: /health responde ok en el backend y a través del frontend](docs/evidencias/d2-health.png)
+
+**D3 · Backend ↔ PostgreSQL**
+
+![D3: las mismas 3 aulas en PostgreSQL y en /rooms](docs/evidencias/d3-rooms.png)
+
+**D4 · Frontend con Docker Compose**
+
+![D4: el frontend muestra aulas y reservas del backend](docs/evidencias/d4-frontend.png)
+
+**D5 · Persistencia**
+
+![D5: el aula creada sigue tras docker compose down y up](docs/evidencias/d5-persistencia.png)
+
+**D6 · `docker stop` del backend**
+
+![D6: el backend parado no se recupera solo; vuelve con docker compose up](docs/evidencias/d6-stop.png)
+
 ### Kubernetes
 
 | # | Experimento | Resultado | Captura |
@@ -122,6 +155,26 @@ Limitaciones:
 | K2 | Escalar el backend a 4 réplicas y volver a 2 | Con `--replicas=4` aparecen 2 Pods nuevos (6 s de edad) junto a los 2 existentes; al bajar a 2, los dos más recientes pasan a `Terminating` y se conservan los antiguos | [k2-escalado.png](docs/evidencias/k2-escalado.png) |
 | K3 | Borrar un Pod del backend | Se borra `backend-...-p2ww7`; justo después ya existe uno nuevo (`pww27`, en `Init:0/1`, ejecutando el initContainer que espera a la base de datos) mientras el viejo está en `Terminating`; 15 s después vuelve a haber 2 réplicas `Running`. Quien lo recrea es el **ReplicaSet** (`DESIRED 2`), que gestiona el Deployment. Un contenedor de Docker borrado a mano no lo recrea nadie (D6) | [k3-self-healing.png](docs/evidencias/k3-self-healing.png) |
 | K4 | Cambiar `APP_ENV` en el ConfigMap | Tras `kubectl patch` a `kubernetes-v2`, `/api/info` sigue diciendo `kubernetes`: las variables de entorno se leen al arrancar el contenedor. Tras `kubectl rollout restart deployment backend` (rolling update, sin corte) devuelve `kubernetes-v2`. Después se restauró el valor original con `kubectl apply -f k8s/configmap.yaml` | [k4-configmap.png](docs/evidencias/k4-configmap.png) |
+
+**K1 · `get pods`, `get services`, `get deployments`**
+
+![K1: Pods, Services, Deployments y StatefulSet en marcha](docs/evidencias/k1-recursos.png)
+
+**K1 · La misma aplicación en Kubernetes (izquierda) y en Docker Compose (derecha)**
+
+![K1: frontend en el NodePort 30080 y en localhost:8080](docs/evidencias/k1-navegador.png)
+
+**K2 · Escalado 2 → 4 → 2**
+
+![K2: escalado del backend a 4 réplicas y vuelta a 2](docs/evidencias/k2-escalado.png)
+
+**K3 · Self-healing**
+
+![K3: Pod borrado, Pod nuevo creado por el ReplicaSet](docs/evidencias/k3-self-healing.png)
+
+**K4 · Cambio en el ConfigMap**
+
+![K4: APP_ENV cambia solo tras el rollout restart](docs/evidencias/k4-configmap.png)
 
 ## 6. Comparativa Docker Compose y Kubernetes
 
@@ -145,7 +198,7 @@ Limitaciones:
 ### 7.1 De comunicación entre servicios: `No route to host` en Docker Compose
 
 - **Síntoma:** al levantar el Compose en el portátil (Fedora), el backend entra en bucle de reinicio. En `docker compose logs backend`: `psycopg.OperationalError: connection to server at "172.19.0.2", port 5432 failed: No route to host`. La base de datos estaba `healthy`.
-- **Diagnóstico:** el error no es de credenciales ni de que PostgreSQL no estuviera listo (eso daría `connection refused` o `authentication failed`): es la red la que rechaza el paquete. `firewall-cmd --info-zone=docker` mostraba la zona `docker` sin ninguna interfaz, así que el puente de la red de Compose quedaba fuera de ella y firewalld rechazaba el tráfico entre contenedores. El mismo Compose funcionaba en el runner de GitHub Actions (Ubuntu, sin firewalld), lo que confirmaba que el fichero estaba bien.
+- **Diagnóstico:** el error no es de credenciales ni de que PostgreSQL no estuviera listo (eso daría `connection refused` o `authentication failed`): es la red la que rechaza el paquete. `firewall-cmd --info-zone=docker` mostraba la zona `docker` sin ninguna interfaz, así que el puente de la red de Compose quedaba fuera de ella y firewalld rechazaba el tráfico entre contenedores. Un Compose equivalente (backend FastAPI y PostgreSQL, de la práctica de CI/CD de otra asignatura) funcionaba en un runner de GitHub Actions con Ubuntu, sin firewalld, lo que apuntaba al host y no a la configuración de Compose.
 - **Solución:** `sudo systemctl restart docker`. Al arrancar, Docker vuelve a registrar sus puentes en la zona `docker` (después: `interfaces: br-... docker0`). Al levantar el Compose de nuevo, su puente aparece en la zona, los dos servicios llegan a `healthy` y el backend lee de PostgreSQL. Efecto secundario: el reinicio para todos los contenedores, incluido el nodo de Minikube (hay que volver a hacer `minikube start`).
 
 ### 7.2 Al construir las imágenes
@@ -158,7 +211,7 @@ No apareció ningún problema al construir las imágenes. Como comprobación, `d
 
 - **Síntoma:** los 3 servicios llegan a `healthy`, pero `/rooms` devuelve `[]` y `SELECT * FROM rooms` da `(0 rows)`: faltan las 3 aulas y las 3 reservas de ejemplo.
 - **Diagnóstico:** en `docker compose logs database` aparece `running /docker-entrypoint-initdb.d/init.sql` seguido de `psql: error: /docker-entrypoint-initdb.d/init.sql: Permission denied`. El fichero tiene permisos de lectura para todos (`-rw-r--r--`), pero dentro del contenedor `ls -l` lo muestra como `-?????????`: no es un problema de permisos Unix sino de **SELinux**. `getenforce` da `Enforcing` y `ls -Z` muestra la etiqueta `user_home_t`, que la política de SELinux no deja leer a los procesos de un contenedor. Las tablas existían igualmente porque las crea el backend al arrancar, por eso no había ningún error visible fuera de los logs. Y como la inicialización solo se intenta con el volumen vacío, los siguientes `up` ya no lo reintentan.
-- **Solución:** montar el fichero con la opción `z` (`./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro,z`), que hace que Docker lo reetiquete como `container_file_t` (contenido compartible entre contenedores). Después, `docker compose down -v` para vaciar el volumen y `up` de nuevo: en los logs salen `CREATE TABLE` e `INSERT 0 3` y la tabla tiene las 3 aulas. En un sistema sin SELinux (como el runner de Ubuntu o Docker Desktop) la opción no cambia nada. En Kubernetes no pasa porque `init.sql` llega al Pod por un ConfigMap montado, no desde el disco del host.
+- **Solución:** montar el fichero con la opción `z` (`./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro,z`), que hace que Docker lo reetiquete como `container_file_t` (contenido compartible entre contenedores). Después, `docker compose down -v` para vaciar el volumen y `up` de nuevo: en los logs salen `CREATE TABLE` e `INSERT 0 3` y la tabla tiene las 3 aulas. En un sistema sin SELinux (Ubuntu, Docker Desktop) la opción no cambia nada. En Kubernetes no pasa porque `init.sql` llega al Pod por un ConfigMap montado, no desde el disco del host.
 
 **b) El puerto 8000 ya está ocupado**
 

@@ -2,6 +2,8 @@
 
 Prototipo de la plataforma de aulas y reservas de SmartCampus Solutions, desplegado de dos formas: con Docker Compose y con Kubernetes (Minikube). La memoria técnica, con la comparativa y las preguntas, está en [MEMORIA.md](MEMORIA.md).
 
+Repositorio: https://github.com/sebasxblanco/smartcampus-k8s
+
 ## Arquitectura
 
 ```
@@ -19,7 +21,7 @@ navegador ──▶ FRONTEND (nginx) ──/api/──▶ BACKEND (FastAPI) ─�
 ## Despliegue con Docker Compose
 
 ```bash
-cp .env.example .env                 # poner una contraseña real en DB_PASSWORD
+cp .env.example .env                 # obligatorio: sin .env, Compose se detiene; poner una contraseña real en DB_PASSWORD
 docker compose up --build -d
 docker compose ps                    # los 3 servicios en marcha
 ```
