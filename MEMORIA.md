@@ -152,7 +152,15 @@ Limitaciones:
 
 _Pendiente: anotar al encontrarlo._
 
-### 7.3 Durante el despliegue: el puerto 8000 ya está ocupado
+### 7.3 Durante el despliegue
+
+**a) La base de datos arranca vacía: `init.sql` sin permiso de lectura**
+
+- **Síntoma:** los 3 servicios llegan a `healthy`, pero `/rooms` devuelve `[]` y `SELECT * FROM rooms` da `(0 rows)`: faltan las 3 aulas y las 3 reservas de ejemplo.
+- **Diagnóstico:** en `docker compose logs database` aparece `running /docker-entrypoint-initdb.d/init.sql` seguido de `psql: error: /docker-entrypoint-initdb.d/init.sql: Permission denied`. El fichero tiene permisos de lectura para todos (`-rw-r--r--`), pero dentro del contenedor `ls -l` lo muestra como `-?????????`: no es un problema de permisos Unix sino de **SELinux**. `getenforce` da `Enforcing` y `ls -Z` muestra la etiqueta `user_home_t`, que la política de SELinux no deja leer a los procesos de un contenedor. Las tablas existían igualmente porque las crea el backend al arrancar, por eso no había ningún error visible fuera de los logs. Y como la inicialización solo se intenta con el volumen vacío, los siguientes `up` ya no lo reintentan.
+- **Solución:** montar el fichero con la opción `z` (`./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro,z`), que hace que Docker lo reetiquete como `container_file_t` (contenido compartible entre contenedores). Después, `docker compose down -v` para vaciar el volumen y `up` de nuevo: en los logs salen `CREATE TABLE` e `INSERT 0 3` y la tabla tiene las 3 aulas. En un sistema sin SELinux (como el runner de Ubuntu o Docker Desktop) la opción no cambia nada. En Kubernetes no pasa porque `init.sql` llega al Pod por un ConfigMap montado, no desde el disco del host.
+
+**b) El puerto 8000 ya está ocupado**
 
 - **Síntoma:** `docker compose up -d --build` levanta la base de datos, pero el backend no arranca: `Bind for 0.0.0.0:8000 failed: port is already allocated`.
 - **Diagnóstico:** `docker ps --filter publish=8000 --filter publish=8080` muestra que los puertos los ocupan contenedores de otro proyecto del mismo equipo (la práctica SmartCampus de la asignatura de Despliegue y Automatización: su entorno de desarrollo en el 8000 y su despliegue de producción en el 8080). Un puerto del host solo lo puede publicar un contenedor a la vez, aunque cada proyecto tenga sus propias redes.

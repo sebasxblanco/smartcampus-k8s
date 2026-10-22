@@ -12,7 +12,9 @@ services:
       # Desde PostgreSQL 18 los datos se montan en /var/lib/postgresql.
       - db-data:/var/lib/postgresql
       # Solo se ejecuta con el volumen vacío: crea las tablas y carga datos de ejemplo.
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      # "z": con SELinux (Fedora) el contenedor no puede leer un fichero del home sin
+      # reetiquetarlo (ver el problema 7.3 de la memoria). Sin SELinux no cambia nada.
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro,z
     networks:
       - backend-net
     healthcheck:
